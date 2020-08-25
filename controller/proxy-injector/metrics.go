@@ -33,31 +33,22 @@ var (
 	}, append(responseLabels, validLabelNames(inject.ProxyAnnotations)...))
 )
 
-func admissionRequestLabels(ownerKind, namespace, annotationAt string, configLabels prometheus.Labels) prometheus.Labels {
+func admissionRequestLabels(ownerKind, namespace, annotationAt string) prometheus.Labels {
+	configLabels := make(prometheus.Labels)
 	configLabels[labelOwnerKind] = ownerKind
 	configLabels[labelNamespace] = namespace
 	configLabels[labelAnnotationAt] = annotationAt
 	return configLabels
 }
 
-func admissionResponseLabels(owner, namespace, skip, reason, annotationAt string, configLabels prometheus.Labels) prometheus.Labels {
+func admissionResponseLabels(owner, namespace, skip, reason, annotationAt string) prometheus.Labels {
+	configLabels := make(prometheus.Labels)
 	configLabels[labelOwnerKind] = owner
 	configLabels[labelNamespace] = namespace
 	configLabels[labelSkip] = skip
 	configLabels[labelReason] = reason
 	configLabels[labelAnnotationAt] = annotationAt
 	return configLabels
-}
-
-func configToPrometheusLabels(conf *inject.ResourceConfig) prometheus.Labels {
-	labels := conf.GetOverriddenConfiguration()
-	promLabels := map[string]string{}
-
-	for label, value := range labels {
-		promLabels[validProxyConfigurationLabel(label)] = value
-
-	}
-	return promLabels
 }
 
 func validLabelNames(labels []string) []string {

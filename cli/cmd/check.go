@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	charts "github.com/linkerd/linkerd2/pkg/charts/linkerd2"
 	"github.com/linkerd/linkerd2/pkg/version"
 
 	"github.com/briandowns/spinner"
@@ -366,17 +367,13 @@ func runChecksJSON(wout io.Writer, werr io.Writer, hc *healthcheck.HealthChecker
 	return result
 }
 
-func renderInstallManifest(ctx context.Context) (string, error) {
-	options, err := newInstallOptionsWithDefaults()
-	if err != nil {
-		return "", err
-	}
-	values, _, err := options.validateAndBuild(ctx, "", nil)
+func renderInstallManifest() (string, error) {
+	values, err := charts.NewValues(false)
 	if err != nil {
 		return "", err
 	}
 	var b strings.Builder
-	if err := render(&b, values); err != nil {
+	if err := render(&b, values, ""); err != nil {
 		return "", err
 	}
 	return b.String(), nil

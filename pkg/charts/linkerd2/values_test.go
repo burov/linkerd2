@@ -16,9 +16,9 @@ func TestNewValues(t *testing.T) {
 	testVersion := "linkerd-dev"
 
 	expected := &Values{
-		Stage:                       "",
-		ControllerImage:             "ghcr.io/linkerd/controller",
-		WebImage:                    "ghcr.io/linkerd/web",
+		ControllerImage:             "ghcr.io/linkerd-io/controller",
+		ControllerImageVersion:      testVersion,
+		WebImage:                    "ghcr.io/linkerd-io/web",
 		ControllerReplicas:          1,
 		ControllerUID:               2103,
 		EnableH2Upgrade:             true,
@@ -143,6 +143,7 @@ func TestNewValues(t *testing.T) {
 	// pin the versions to ensure consistent test result.
 	// in non-test environment, the default versions are read from the
 	// values.yaml.
+	actual.ControllerImageVersion = testVersion
 	actual.Global.ControllerImageVersion = testVersion
 	actual.Global.Proxy.Image.Version = testVersion
 	actual.Global.ProxyInit.Image.Version = testVersion
@@ -238,6 +239,7 @@ func TestNewValues(t *testing.T) {
 		// pin the versions to ensure consistent test result.
 		// in non-test environment, the default versions are read from the
 		// values.yaml.
+		actual.ControllerImageVersion = testVersion
 		actual.Global.ControllerImageVersion = testVersion
 		actual.Global.Proxy.Image.Version = testVersion
 		actual.Global.ProxyInit.Image.Version = testVersion

@@ -7,9 +7,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 
-	pb "github.com/linkerd/linkerd2/controller/gen/config"
 	"github.com/linkerd/linkerd2/controller/k8s"
-	"github.com/linkerd/linkerd2/pkg/config"
+	charts "github.com/linkerd/linkerd2/pkg/charts/linkerd2"
 	"github.com/linkerd/linkerd2/pkg/inject"
 	pkgK8s "github.com/linkerd/linkerd2/pkg/k8s"
 	"github.com/linkerd/linkerd2/pkg/version"
@@ -26,25 +25,18 @@ const (
 	eventTypeTracing  = "Tracing"
 )
 
+// Injection type represents the data required to perform a inject event
+type Injection struct {
+	values *charts.Values
+}
+
 // Inject returns an AdmissionResponse containing the patch, if any, to apply
 // to the pod (proxy sidecar and eventually the init container to set it up)
-func Inject(
-	ctx context.Context,
-	api *k8s.API,
+func (i *Injection) Inject(api *k8s.API,
 	request *admissionv1beta1.AdmissionRequest,
 	recorder record.EventRecorder,
 ) (*admissionv1beta1.AdmissionResponse, error) {
 	log.Debugf("request object bytes: %s", request.Object.Raw)
-
-	globalConfig, err := config.Global(pkgK8s.MountPathGlobalConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	proxyConfig, err := config.Proxy(pkgK8s.MountPathProxyConfig)
-	if err != nil {
-		return nil, err
-	}
 
 	namespace, err := api.NS().Lister().Get(request.Namespace)
 	if err != nil {
@@ -52,9 +44,8 @@ func Inject(
 	}
 	nsAnnotations := namespace.GetAnnotations()
 
-	configs := &pb.All{Global: globalConfig, Proxy: proxyConfig}
-	resourceConfig := inject.NewResourceConfig(configs, inject.OriginWebhook).
-		WithOwnerRetriever(ownerRetriever(ctx, api, request.Namespace)).
+	resourceConfig := inject.NewResourceConfig(i.values, inject.OriginWebhook).
+		WithOwnerRetriever(ownerRetriever(api, request.Namespace)).
 		WithNsAnnotations(nsAnnotations).
 		WithKind(request.Kind.Kind)
 	report, err := resourceConfig.ParseMetaAndYAML(request.Object.Raw)
@@ -68,7 +59,6 @@ func Inject(
 		Allowed: true,
 	}
 
-	configLabels := configToPrometheusLabels(resourceConfig)
 	var parent *runtime.Object
 	ownerKind := ""
 	if ownerRef := resourceConfig.GetOwnerRef(); ownerRef != nil {
@@ -82,7 +72,7 @@ func Inject(
 		}
 		ownerKind = strings.ToLower(ownerRef.Kind)
 	}
-	proxyInjectionAdmissionRequests.With(admissionRequestLabels(ownerKind, request.Namespace, report.InjectAnnotationAt, configLabels)).Inc()
+	proxyInjectionAdmissionRequests.With(admissionRequestLabels(ownerKind, request.Namespace, report.InjectAnnotationAt)).Inc()
 
 	if injectable, reasons := report.Injectable(); !injectable {
 		var readableReasons, metricReasons string
@@ -96,7 +86,7 @@ func Inject(
 			recorder.Eventf(*parent, v1.EventTypeNormal, eventTypeSkipped, "Linkerd sidecar proxy injection skipped: %s", readableReasons)
 		}
 		log.Infof("skipped %s: %s", report.ResName(), readableReasons)
-		proxyInjectionAdmissionResponses.With(admissionResponseLabels(ownerKind, request.Namespace, "true", metricReasons, report.InjectAnnotationAt, configLabels)).Inc()
+		proxyInjectionAdmissionResponses.With(admissionResponseLabels(ownerKind, request.Namespace, "true", metricReasons, report.InjectAnnotationAt)).Inc()
 		return admissionResponse, nil
 	}
 
@@ -120,7 +110,7 @@ func Inject(
 	}
 	log.Infof("patch generated for: %s", report.ResName())
 	log.Debugf("patch: %s", patchJSON)
-	proxyInjectionAdmissionResponses.With(admissionResponseLabels(ownerKind, request.Namespace, "false", "", report.InjectAnnotationAt, configLabels)).Inc()
+	proxyInjectionAdmissionResponses.With(admissionResponseLabels(ownerKind, request.Namespace, "false", "", report.InjectAnnotationAt)).Inc()
 	patchType := admissionv1beta1.PatchTypeJSONPatch
 	admissionResponse.Patch = patchJSON
 	admissionResponse.PatchType = &patchType
